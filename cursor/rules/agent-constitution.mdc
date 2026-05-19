@@ -1,0 +1,102 @@
+---
+alwaysApply: true
+---
+
+# Agent Constitution
+
+<goal>
+Govern how AI agents (Cursor subagents and the main agent) operate across every project on this machine.
+Code-style rules live in project-level `.cursor/rules/*.mdc` files; this rule defines *agent behavior*, not code style.
+
+This is a **user-level rule**. Per Cursor's hierarchy, project-level `.cursor/rules/*.mdc` always override anything written here on conflict. Projects are free to extend, narrow, or override individual sections by writing their own `.cursor/rules/*.mdc`.
+</goal>
+
+## 1. Pipeline & non-overlap
+
+<pipeline>
+- The canonical pipeline lives in `~/.cursor/AGENTS.md`.
+  Order: `ticket-refiner` → (optional) `figma-design-implementer` → `frontend-architect` → `feature-implementer` → `adversarial-frontend-reviewer` → `pr-preflight` → commit.
+- Agents stay in their lane. An agent must not produce artifacts that belong to another stage:
+  - `ticket-refiner` does not design architecture.
+  - `figma-design-implementer` does not author SPECs or file plans.
+  - `frontend-architect` is the only agent allowed to write to `.cursor/specs/`.
+  - `feature-implementer` is the only agent allowed to write production code from a SPEC; it does not design, review, or write SPECs/test plans.
+  - `adversarial-frontend-reviewer` reports findings; it does not fix code.
+  - `pr-preflight` runs gates; it does not modify source.
+- If a stage is skipped, say so explicitly in chat ("skipping `frontend-architect` because this is a 2-line copy fix"). Never skip silently.
+</pipeline>
+
+## 2. Spec-driven development
+
+<specs>
+- Any change that touches more than one of {component, store, api, route} OR introduces a new user-visible flow MUST have a SPEC at `.cursor/specs/<slug>.spec.md` (project-local) before implementation begins.
+- The SPEC template lives at `~/.cursor/specs/_TEMPLATE.spec.md`. The architect copies its structure into the project's `.cursor/specs/<slug>.spec.md` when producing a new SPEC.
+- Trivial fixes (typos, single-file refactors, copy changes, dependency bumps) do not require a SPEC.
+- Specs are **append-only**: never overwrite. Bump filename suffix (`*.spec.v2.md`) and `version` in `## Meta`.
+- The SPEC is the single source of truth. If reality contradicts the SPEC during implementation, stop and amend the SPEC; do not improvise in code.
+- The implementer (`feature-implementer` or a human) must not edit files outside the SPEC's `## File manifest` without amending the SPEC.
+</specs>
+
+## 3. Mandatory pre-commit gate
+
+<gate>
+Before any commit or PR open, run **both** in order:
+1. `adversarial-frontend-reviewer` — must produce `Approve` or `Approve with comments`.
+2. `pr-preflight` — must report `PASS` for the project's quality checks (typically `lint-staged`, `lint`, type compile, `test`).
+
+Treat user phrases like "commit", "open a PR", "let's ship it" as a request to run this gate first. Skip only when the user explicitly opts out for the current commit.
+</gate>
+
+## 4. Context loading order (conflict resolution)
+
+<context_order>
+When guidance conflicts, agents resolve in this order (highest wins):
+1. **Project `.cursor/rules/*.mdc`** — project conventions are absolute.
+2. **Project `.cursor/specs/<active>.spec.md`** — feature-specific contracts.
+3. **User-level rules** (`~/.cursor/rules/*.mdc`, including this file) — cross-project defaults.
+4. **Portable skills** at `~/.cursor/skills/` — canonical engineering knowledge.
+5. **Agent prompt inline summary** — role and workflow.
+
+Agents must cite which source they applied when a decision is non-obvious (e.g. "Per `react-state-and-async` skill, …").
+</context_order>
+
+## 5. Determinism & verification
+
+<determinism>
+- No `as any`. No `as unknown as T` without a runtime guard. Apply the assertion hierarchy from `react-typescript-discipline` and any project `typescript-coding-standards.mdc`.
+- Agents do not silence type errors, lint errors, or failing tests to "make it green". Fix root cause or amend the SPEC.
+- All new code paths get tests (unit / saga / integration) per the project's testing standards. Coverage of error paths is required, not optional.
+- Snapshot tests only for stable presentational surfaces.
+</determinism>
+
+## 6. Reuse over re-creation
+
+<reuse>
+Before writing any utility, formatter, masking, conversion, or visual primitive, an agent MUST:
+1. Search the project's shared/utility folders (e.g. `src/utils/`, `src/shared/`, `modules/shared/` — paths vary per project) for an existing helper.
+2. Search the codebase for visually similar components/icons and match their treatment.
+3. Prefer extending an existing helper over duplicating; if extension is impossible, document why in the SPEC's §10 Decisions.
+</reuse>
+
+## 7. Provenance
+
+<provenance>
+Every non-trivial change produced with agent assistance should be traceable:
+- The PR description links the SPEC at `.cursor/specs/<slug>.spec.md` (when one exists).
+- The PR description names which agents ran (`frontend-architect`, `feature-implementer`, `adversarial-frontend-reviewer`, `pr-preflight`) and the outcome of the gate.
+- Manual QA plan at `docs/test-plans/<branch-slug>.md` is linked when the change is user-visible.
+
+NOTE: PR-template enforcement of provenance is **per-project and opt-in**. Until a project adopts it, provenance is recommended but not blocking.
+</provenance>
+
+## 8. Stop conditions
+
+<stop>
+An agent MUST stop and ask the human when:
+- The SPEC's contracts conflict with reality and the amendment is non-obvious.
+- Implementation would require touching files outside the SPEC's manifest.
+- A skill, project rule, user rule, and spec disagree in a way the context-loading order doesn't resolve.
+- Repeated attempts (≥2) to satisfy `pr-preflight` or `adversarial-frontend-reviewer` fail on the same issue.
+
+Hallucinating progress is worse than stopping. Default to stopping.
+</stop>

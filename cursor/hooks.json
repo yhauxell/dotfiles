@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "hooks/ticket-refiner-router.py",
+        "matcher": "UserPromptSubmit",
+        "timeout": 3,
+        "failClosed": false
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": "hooks/manual-test-planner-trigger.py",
+        "matcher": "^adversarial-frontend-reviewer$",
+        "timeout": 5,
+        "failClosed": false,
+        "loop_limit": 1
+      }
+    ]
+  }
+}
