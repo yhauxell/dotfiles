@@ -63,6 +63,7 @@ Each agent's `model:` is pinned in its YAML frontmatter so it does not inherit t
 | `adversarial-frontend-reviewer` | `claude-4.7-opus` | Finding non-obvious bugs is pure reasoning depth. False negatives ship to prod. |
 | `pr-preflight` | `composer-2` | Mechanical: runs shell commands, summarizes failures. No creative work. |
 | `manual-test-planner` | `claude-4.6-sonnet` | Writes for humans; needs behavioral reasoning and good prose. Sonnet is the strongest writer at workhorse price. |
+| `pipeline-orchestrator` | `claude-4.6-sonnet` | State machine + dispatch; must reason about stage/checkpoints without doing implementation. |
 
 **Override**: edit the `model:` field in `~/.cursor/agents/<name>.md`. Removing the field falls back to `inherit` (parent agent's model). For Opus/GPT-5.4+ pins, Max Mode must be enabled on the account.
 
@@ -85,7 +86,22 @@ Platform-specific engineering knowledge lives in **portable skills** at `~/.curs
 - Always load `react-state-and-async`, `react-performance`, `react-accessibility`, `react-testing-discipline`, `react-typescript-discipline` when the diff/feature touches their concern.
 - **Conflict resolution**: project `.cursor/rules/*.mdc` override skills (project conventions win). Skills override the agent prompt's inline summary (skills are authoritative). The agent prompt drives role and workflow; the skills provide the engineering content.
 
+- **`pipeline-orchestrator`** (L3 conductor)
+  - **Purpose**: Tracks pipeline progress in **project-local** `.cursor/pipeline/<slug>.state.yaml`, launches exactly one downstream subagent per step via the Task tool, and **stops at human checkpoints** (`approve spec` before implementer; gate before ship).
+  - **Location**: `~/.cursor/agents/pipeline-orchestrator.md`
+  - **State template**: `~/.cursor/pipeline/_TEMPLATE.state.yaml`
+  - **How to use**:
+    - `start pipeline for <ticket URL or PROJ-123 + description>` — creates state, runs `ticket-refiner`
+    - `continue pipeline` — runs the next eligible stage
+    - `pipeline status` — dashboard without running agents
+    - `approve spec` — human gate after architect; then `continue pipeline` for implementer
+    - `run gate` — reviewer → preflight in order
+    - `run until blocked` — auto-advance until next human gate or failure
+  - **Does not**: write SPECs, code, reviews, or test plans; does not commit.
+
 ### End-to-end agent chain
+
+**L3 entry point:** invoke `pipeline-orchestrator` once instead of naming each agent manually.
 
 The agents form a pipeline. Each one has a single, non-overlapping job:
 
@@ -161,7 +177,13 @@ User hooks live at `~/.cursor/hooks.json` with scripts in `~/.cursor/hooks/`. Tw
 - **Behavior**: best-effort prompt rewrite that routes pasted ticket URLs (ClickUp, Linear, Jira, GitHub/GitLab Issues, Shortcut) or `PROJ-123`-style ticket keys to the `ticket-refiner` subagent. Generic enough that most tracker URL patterns work.
 - **Fail mode**: open — if prompt rewriting isn't supported in your Cursor version, the hook fails silently and you can still invoke `ticket-refiner` manually.
 
-#### 2. Auto-trigger manual test plan after adversarial review
+#### 2. Pre-ship gate reminder (commit / PR / push)
+- **Trigger**: `beforeSubmitPrompt` (matcher: `UserPromptSubmit`)
+- **Script**: `~/.cursor/hooks/pipeline-gate-router.py`
+- **Behavior**: when the prompt mentions commit, push, open PR, or ship, rewrites to run `adversarial-frontend-reviewer` then `pr-preflight` first (or `pipeline-orchestrator` `run gate`). Opt out with `skip gate` in the prompt.
+- **Fail mode**: open.
+
+#### 3. Auto-trigger manual test plan after adversarial review
 - **Trigger**: `subagentStop` (matcher: `^adversarial-frontend-reviewer$`)
 - **Script**: `~/.cursor/hooks/manual-test-planner-trigger.py`
 - **Behavior**: emits a `followup_message` instructing the parent agent to invoke `manual-test-planner` and save the plan to `docs/test-plans/<branch-slug>.md`.

@@ -107,3 +107,19 @@ The Cursor module is the "agent factory" for spec-driven development. Entry poin
 - `cursor/AGENTS.md` — the pipeline, agent registry, model selection per agent.
 - `cursor/rules/agent-constitution.mdc` — user-level rule (always applied) governing how every agent operates across projects.
 - `cursor/specs/_TEMPLATE.spec.md` — global SPEC template. Real specs live per-project under `<project>/.cursor/specs/`.
+- `cursor/agents/pipeline-orchestrator.md` — **L3 conductor**: state file + staged subagent launches.
+- `cursor/pipeline/_TEMPLATE.state.yaml` — pipeline state template (copy to `<project>/.cursor/pipeline/<slug>.state.yaml`).
+
+### L3 orchestration (quick start)
+
+In any project chat:
+
+```text
+start pipeline for PROJ-123: <paste ticket>
+continue pipeline
+approve spec
+continue pipeline
+run gate
+```
+
+State lives at `<project>/.cursor/pipeline/<slug>.state.yaml`. Commit it for team visibility, or add `*.state.yaml` to the project `.gitignore` if you prefer local-only.

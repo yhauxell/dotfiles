@@ -1,0 +1,47 @@
+# Pipeline state template (do not use in place — copy to the active project).
+# Path: <project>/.cursor/pipeline/<feature-slug>.state.yaml
+#
+# The pipeline-orchestrator is the only agent that creates/updates this file.
+# Append-only history: never delete log entries; add new ones at the bottom.
+
+version: 1
+slug: <kebab-feature-slug>          # e.g. proj-123-saga-policy-gates
+ticket: <TICKET-KEY or null>        # e.g. PROJ-123
+branch: <git-branch-name or null>     # e.g. feat/PROJ-123-saga-policy-gates
+repo_root: <absolute path or null>  # filled by orchestrator
+
+# Current stage (single source of truth for "where are we").
+# Allowed values — see pipeline-orchestrator agent for transitions.
+stage: not_started
+
+# Artifact pointers (updated as stages complete)
+artifacts:
+  refined_story_path: null          # optional: path if saved to disk
+  design_context_path: null           # optional
+  spec_path: null                   # e.g. .cursor/specs/proj-123-feature.spec.md
+  test_plan_path: null              # e.g. docs/test-plans/feat-proj-123.md
+
+# Human-in-the-loop checkpoints (orchestrator will not advance past these without explicit approval)
+checkpoints:
+  spec_approved: false              # required before feature-implementer
+  ship_approved: false              # optional; set true before commit/PR if you use that gate
+
+# Last gate outcomes (updated after verification stages)
+gates:
+  reviewer_verdict: null            # Approve | Approve with comments | Request changes | Block
+  preflight_result: null            # PASS | FAIL
+
+# Optional inputs captured at start
+inputs:
+  ticket_url: null
+  figma_url: null
+  skip_figma: false
+  trivial_fix: false                # if true, orchestrator uses fast-path (no SPEC pipeline)
+
+# Transition log (append-only)
+log:
+  - at: <ISO-8601>
+    from: not_started
+    to: not_started
+    agent: pipeline-orchestrator
+    note: initialized

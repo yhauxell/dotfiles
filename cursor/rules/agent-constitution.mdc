@@ -16,6 +16,7 @@ This is a **user-level rule**. Per Cursor's hierarchy, project-level `.cursor/ru
 <pipeline>
 - The canonical pipeline lives in `~/.cursor/AGENTS.md`.
   Order: `ticket-refiner` → (optional) `figma-design-implementer` → `frontend-architect` → `feature-implementer` → `adversarial-frontend-reviewer` → `pr-preflight` → commit.
+  **L3:** `pipeline-orchestrator` may drive the above sequence using project-local `.cursor/pipeline/<slug>.state.yaml`; human must `approve spec` before implementation.
 - Agents stay in their lane. An agent must not produce artifacts that belong to another stage:
   - `ticket-refiner` does not design architecture.
   - `figma-design-implementer` does not author SPECs or file plans.
@@ -23,6 +24,7 @@ This is a **user-level rule**. Per Cursor's hierarchy, project-level `.cursor/ru
   - `feature-implementer` is the only agent allowed to write production code from a SPEC; it does not design, review, or write SPECs/test plans.
   - `adversarial-frontend-reviewer` reports findings; it does not fix code.
   - `pr-preflight` runs gates; it does not modify source.
+  - `pipeline-orchestrator` updates pipeline state and launches subagents; it does not design, implement, or review.
 - If a stage is skipped, say so explicitly in chat ("skipping `frontend-architect` because this is a 2-line copy fix"). Never skip silently.
 </pipeline>
 

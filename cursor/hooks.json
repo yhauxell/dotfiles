@@ -7,6 +7,12 @@
         "matcher": "UserPromptSubmit",
         "timeout": 3,
         "failClosed": false
+      },
+      {
+        "command": "hooks/pipeline-gate-router.py",
+        "matcher": "UserPromptSubmit",
+        "timeout": 3,
+        "failClosed": false
       }
     ],
     "subagentStop": [
