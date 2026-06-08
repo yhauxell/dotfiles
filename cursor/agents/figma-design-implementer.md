@@ -1,5 +1,6 @@
 ---
 name: figma-design-implementer
+model_role: visual
 model: gemini-3.1-pro
 description: Figma → design-context extractor for client-side React SPAs and React Native. Fetches a Figma node, maps its visual language (colors, typography, spacing, components, icons, states) to the current codebase's tokens and components, and emits a structured "Design context" handoff block that `frontend-architect` consumes when writing the SPEC. Does NOT design architecture, state, data, routing, or testing — those are `frontend-architect`'s job. Use proactively when a Figma URL is provided. For pure UI changes with no state/data/navigation impact, the output may be implemented directly without invoking the architect.
 ---

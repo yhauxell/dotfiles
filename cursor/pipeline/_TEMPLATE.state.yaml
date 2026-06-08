@@ -1,14 +1,21 @@
 # Pipeline state template (do not use in place — copy to the active project).
 # Path: <project>/.cursor/pipeline/<feature-slug>.state.yaml
 #
+# Only used for `epic`-class changes (per agent-constitution §0). `trivial`
+# and `feature` classes do NOT create state files.
+#
 # The pipeline-orchestrator is the only agent that creates/updates this file.
+# The writer-guard.py hook enforces this; violations are logged to
+# ~/.cursor/audit/writer-violations.jsonl.
+#
 # Append-only history: never delete log entries; add new ones at the bottom.
 
-version: 1
+version: 2
 slug: <kebab-feature-slug>          # e.g. proj-123-saga-policy-gates
 ticket: <TICKET-KEY or null>        # e.g. PROJ-123
 branch: <git-branch-name or null>     # e.g. feat/PROJ-123-saga-policy-gates
 repo_root: <absolute path or null>  # filled by orchestrator
+change_class: epic                  # must be `epic` — see agent-constitution §0
 
 # Current stage (single source of truth for "where are we").
 # Allowed values — see pipeline-orchestrator agent for transitions.
@@ -16,10 +23,10 @@ stage: not_started
 
 # Artifact pointers (updated as stages complete)
 artifacts:
-  refined_story_path: null          # optional: path if saved to disk
-  design_context_path: null           # optional
+  refined_story_path: null          # optional: path if saved to disk (refined story is usually in conversational context)
+  design_context_path: null         # optional
   spec_path: null                   # e.g. .cursor/specs/proj-123-feature.spec.md
-  test_plan_path: null              # e.g. docs/test-plans/feat-proj-123.md
+  test_plan_path: null              # only if user opted in to manual-test-planner
 
 # Human-in-the-loop checkpoints (orchestrator will not advance past these without explicit approval)
 checkpoints:
@@ -29,19 +36,18 @@ checkpoints:
 # Last gate outcomes (updated after verification stages)
 gates:
   reviewer_verdict: null            # Approve | Approve with comments | Request changes | Block
-  preflight_result: null            # PASS | FAIL
+  preflight_result: null            # PASS | FAIL  (from cursor/scripts/preflight.sh)
 
 # Optional inputs captured at start
 inputs:
   ticket_url: null
   figma_url: null
   skip_figma: false
-  trivial_fix: false                # if true, orchestrator uses fast-path (no SPEC pipeline)
 
 # Transition log (append-only)
 log:
   - at: <ISO-8601>
     from: not_started
     to: not_started
-    agent: pipeline-orchestrator
+    agent_or_script: pipeline-orchestrator
     note: initialized

@@ -5,7 +5,16 @@
       "Bash(~/.claude/scripts/preflight.sh:*)",
       "Bash(./cursor/scripts/preflight.sh:*)",
       "Read(./.claude/specs/**)",
-      "Read(./.claude/pipeline/**)"
+      "Read(./.claude/pipeline/**)",
+      "Bash(git push:*)",
+      "Bash(git diff:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git branch:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh auth status)"
     ],
     "deny": [
       "Read(./.env)",

@@ -15,13 +15,16 @@
         "failClosed": false
       }
     ],
-    "subagentStop": [
+    "afterFileEdit": [
       {
-        "command": "hooks/manual-test-planner-trigger.py",
-        "matcher": "^adversarial-frontend-reviewer$",
+        "command": "hooks/writer-guard.py",
+        "timeout": 3,
+        "failClosed": true
+      },
+      {
+        "command": "hooks/spec-archive.py",
         "timeout": 5,
-        "failClosed": false,
-        "loop_limit": 1
+        "failClosed": false
       }
     ]
   }

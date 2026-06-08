@@ -28,7 +28,7 @@ OPT_OUT_RE = re.compile(
 )
 
 ALREADY_ROUTED_RE = re.compile(
-    r"\b(adversarial-frontend-reviewer|pr-preflight|run (the )?gate|pipeline-orchestrator)\b",
+    r"\b(adversarial-frontend-reviewer|preflight\.sh|pr-preflight|run (the )?gate|pipeline-orchestrator)\b",
     re.IGNORECASE,
 )
 
@@ -70,12 +70,14 @@ def main() -> int:
 
     updated = (
         "Before committing, pushing, or opening a PR, run the mandatory pre-ship gate "
-        "(per agent-constitution):\n"
+        "(per agent-constitution §3):\n"
         "1. `adversarial-frontend-reviewer` — must be Approve or Approve with comments.\n"
-        "2. `pr-preflight` — must PASS.\n"
-        "Or invoke `pipeline-orchestrator` with `run gate` if pipeline state exists.\n"
-        "Only proceed with the user's original request after both pass, unless they "
-        "explicitly opted out with 'skip gate'.\n\n"
+        "2. `cursor/scripts/preflight.sh` — must report PASS (run via Bash).\n"
+        "If an epic pipeline state exists, invoke `pipeline-orchestrator` with "
+        "`run gate` instead.\n"
+        "For `trivial`-class changes, only step 2 is required.\n"
+        "Only proceed with the user's original request after the gate passes, "
+        "unless they explicitly opted out with 'skip gate'.\n\n"
         "Original request:\n"
         f"{text.strip()}\n"
     )

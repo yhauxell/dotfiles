@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """
-beforeSubmitPrompt hook: routes pasted ticket URLs / ticket keys to the
-`ticket-refiner` subagent.
+beforeSubmitPrompt hook: detects pasted ticket URLs / ticket keys and routes
+the main agent to apply the `ticket-refinement` skill before doing anything
+else.
 
 Supported tracker URL hosts: ClickUp, Linear, Jira (atlassian.net), GitHub
 Issues, GitLab Issues, Shortcut. Ticket-key heuristic also matches generic
 `PROJ-123`-style identifiers, so most other trackers work too.
+
+History: previously routed to a `ticket-refiner` subagent. That agent was
+demoted to a skill (cursor/skills/ticket-refinement/SKILL.md) — the main
+agent now applies the skill directly, no subagent rental needed.
 
 Fails open on parse errors or unsupported Cursor versions — never blocks
 prompt submission.
@@ -35,10 +40,6 @@ TICKET_ID_RE = re.compile(r"\b[A-Z]{2,20}-\d{1,8}\b")
 
 
 def _extract_text(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Best-effort: hook payload shapes can vary by Cursor version/event.
-    Return (field_name, text).
-    """
     for key in ("prompt", "input", "content", "message", "text", "user_prompt"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
@@ -62,9 +63,9 @@ def _should_route(text: str) -> bool:
     return False
 
 
-def _already_invokes_refiner(text: str) -> bool:
+def _already_invokes_skill(text: str) -> bool:
     t = text.lower()
-    return "ticket-refiner" in t or "use the ticket-refiner" in t
+    return "ticket-refinement" in t or "ticket-refiner" in t
 
 
 def main() -> int:
@@ -84,13 +85,20 @@ def main() -> int:
         print(json.dumps({"permission": "allow"}))
         return 0
 
-    if not _should_route(text) or _already_invokes_refiner(text):
+    if not _should_route(text) or _already_invokes_skill(text):
         print(json.dumps({"permission": "allow"}))
         return 0
 
     updated = (
-        "Use the ticket-refiner subagent to refine this ticket / story.\n\n"
-        "Input:\n"
+        "A ticket URL or ticket key was detected in this prompt. Before "
+        "doing anything else, apply the `ticket-refinement` skill "
+        "(~/.cursor/skills/ticket-refinement/SKILL.md) to produce a refined "
+        "engineering story (Gherkin AC, impacted areas, API/data impacts, "
+        "edge cases). Then proceed with the original request, using the "
+        "refined story as context.\n\n"
+        "Skip refinement only if the change_class is `trivial` (copy tweak, "
+        "single-file refactor, dep bump).\n\n"
+        "Original request:\n"
         f"{text.strip()}\n"
     )
 

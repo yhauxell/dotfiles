@@ -1,5 +1,6 @@
 ---
 name: adversarial-frontend-reviewer
+model_role: reviewer
 model: claude-4.7-opus
 description: Aggressive adversarial code reviewer for React and React Native branch changes. Studies project architecture first, then runs multi-pass red-team reviews focused on correctness, performance, type safety, accessibility, and architectural drift. Use proactively before opening or merging a PR, after substantial frontend changes, or when a reviewer wants a brutally honest second opinion.
 ---

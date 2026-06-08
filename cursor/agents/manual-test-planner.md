@@ -1,5 +1,6 @@
 ---
 name: manual-test-planner
+model_role: writer
 model: claude-4.6-sonnet
 description: Manual QA specialist for branch changes in client-side React SPAs and React Native. Reads the current branch's diff against its base, detects the stack, and produces a simple, easy-to-follow manual test plan as a markdown file at `docs/test-plans/<branch-slug>.md`. Output is written for human testers (engineers or QA), not for AI consumption — plain language, step-by-step, behavior-focused. Use proactively after `adversarial-frontend-reviewer` finishes, before opening a PR, or when a branch has user-visible changes that need manual verification. Auto-triggered by the hook on `subagentStop` of the adversarial reviewer.
 ---

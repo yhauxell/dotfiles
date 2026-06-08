@@ -11,30 +11,50 @@ Code-style rules live in project-level `.cursor/rules/*.mdc` files; this rule de
 This is a **user-level rule**. Per Cursor's hierarchy, project-level `.cursor/rules/*.mdc` always override anything written here on conflict. Projects are free to extend, narrow, or override individual sections by writing their own `.cursor/rules/*.mdc`.
 </goal>
 
+## 0. Routing by change class
+
+<routing>
+**Decide the change class up front, before invoking any subagent.** This is the single most important decision in the pipeline — it determines how much process the change gets. Default to the lightest class that fits; over-classifying burns Opus rentals on trivial work.
+
+| Class | Heuristic | Process |
+|-------|-----------|---------|
+| **`trivial`** | One file, no new user-visible behavior. Copy tweaks, typo fixes, dep bumps, single-icon swaps, comment changes. | Main agent edits directly. Run `cursor/scripts/preflight.sh` before commit. **No** SPEC, **no** subagents, **no** orchestrator. |
+| **`feature`** | New user-visible flow, OR change touches ≥2 of {component, store, api, route}, OR non-trivial state/async work. | `ticket-refinement` skill (if a ticket exists) → `figma-design-implementer` (if Figma URL) → `frontend-architect` (SPEC) → `feature-implementer` → `adversarial-frontend-reviewer` → `cursor/scripts/preflight.sh` → commit. **No orchestrator** — invoke each agent directly. |
+| **`epic`** | Multi-feature or multi-week. Crosses module boundaries. Multiple SPECs likely. Worth tracking state across sessions. | Same agents as `feature`, but driven by `pipeline-orchestrator` with project-local `.cursor/pipeline/<slug>.state.yaml`. Human checkpoint at `approve spec` is mandatory. |
+
+**State the class explicitly in chat** when starting work ("this is a `feature`-class change because it adds a new route and a new store slice"). If unsure, default to the lighter class and escalate only if reality demands it — under-classifying is cheap to fix mid-flight; over-classifying wastes a full pipeline pass.
+
+**The orchestrator is opt-in.** `pipeline-orchestrator` is only invoked for `epic` class. For `feature` class, the user (or main agent) drives the sequence directly — three or four messages, no state YAML, no 17-stage enum.
+</routing>
+
 ## 1. Pipeline & non-overlap
 
 <pipeline>
-- The canonical pipeline lives in `~/.cursor/AGENTS.md`.
-  Order: `ticket-refiner` → (optional) `figma-design-implementer` → `frontend-architect` → `feature-implementer` → `adversarial-frontend-reviewer` → `pr-preflight` → commit.
-  **L3:** `pipeline-orchestrator` may drive the above sequence using project-local `.cursor/pipeline/<slug>.state.yaml`; human must `approve spec` before implementation.
-- Agents stay in their lane. An agent must not produce artifacts that belong to another stage:
-  - `ticket-refiner` does not design architecture.
+The canonical pipeline (for `feature` and `epic` classes) lives in `~/.cursor/AGENTS.md`:
+
+  `ticket-refinement` skill → (optional) `figma-design-implementer` → `frontend-architect` → `feature-implementer` → `adversarial-frontend-reviewer` → `preflight.sh` → commit.
+
+For `epic` class only: `pipeline-orchestrator` drives this sequence using `.cursor/pipeline/<slug>.state.yaml`; human must `approve spec` before implementation.
+
+Agents stay in their lane. An agent must not produce artifacts that belong to another stage:
   - `figma-design-implementer` does not author SPECs or file plans.
   - `frontend-architect` is the only agent allowed to write to `.cursor/specs/`.
   - `feature-implementer` is the only agent allowed to write production code from a SPEC; it does not design, review, or write SPECs/test plans.
   - `adversarial-frontend-reviewer` reports findings; it does not fix code.
-  - `pr-preflight` runs gates; it does not modify source.
+  - `manual-test-planner` (opt-in only) is the only agent allowed to write to `docs/test-plans/`.
   - `pipeline-orchestrator` updates pipeline state and launches subagents; it does not design, implement, or review.
-- If a stage is skipped, say so explicitly in chat ("skipping `frontend-architect` because this is a 2-line copy fix"). Never skip silently.
+
+If a stage is skipped, say so explicitly in chat ("skipping `frontend-architect` because this is `trivial` class"). Never skip silently.
+
+The `writer-guard.py` hook enforces these single-writer invariants post-hoc and logs violations to `~/.cursor/audit/writer-violations.jsonl`.
 </pipeline>
 
 ## 2. Spec-driven development
 
 <specs>
-- Any change that touches more than one of {component, store, api, route} OR introduces a new user-visible flow MUST have a SPEC at `.cursor/specs/<slug>.spec.md` (project-local) before implementation begins.
+- `feature` and `epic` classes require a SPEC at `.cursor/specs/<slug>.spec.md` before implementation begins. `trivial` does not.
 - The SPEC template lives at `~/.cursor/specs/_TEMPLATE.spec.md`. The architect copies its structure into the project's `.cursor/specs/<slug>.spec.md` when producing a new SPEC.
-- Trivial fixes (typos, single-file refactors, copy changes, dependency bumps) do not require a SPEC.
-- Specs are **append-only**: never overwrite. Bump filename suffix (`*.spec.v2.md`) and `version` in `## Meta`.
+- Specs are **append-only**: never overwrite. Bump filename suffix (`*.spec.v2.md`) and `version` in `## Meta`. The `spec-archive.py` hook auto-moves older versions into `.cursor/specs/archive/`.
 - The SPEC is the single source of truth. If reality contradicts the SPEC during implementation, stop and amend the SPEC; do not improvise in code.
 - The implementer (`feature-implementer` or a human) must not edit files outside the SPEC's `## File manifest` without amending the SPEC.
 </specs>
@@ -42,11 +62,14 @@ This is a **user-level rule**. Per Cursor's hierarchy, project-level `.cursor/ru
 ## 3. Mandatory pre-commit gate
 
 <gate>
-Before any commit or PR open, run **both** in order:
-1. `adversarial-frontend-reviewer` — must produce `Approve` or `Approve with comments`.
-2. `pr-preflight` — must report `PASS` for the project's quality checks (typically `lint-staged`, `lint`, type compile, `test`).
+Before any commit or PR open:
 
-Treat user phrases like "commit", "open a PR", "let's ship it" as a request to run this gate first. Skip only when the user explicitly opts out for the current commit.
+- **`trivial` class**: run `cursor/scripts/preflight.sh` — must PASS. Reviewer is optional.
+- **`feature` and `epic` classes**: run **both** in order:
+  1. `adversarial-frontend-reviewer` — must produce `Approve` or `Approve with comments`.
+  2. `cursor/scripts/preflight.sh` — must report `PASS`.
+
+Treat user phrases like "commit", "open a PR", "let's ship it" as a request to run the appropriate gate first. Skip only when the user explicitly opts out for the current commit.
 </gate>
 
 ## 4. Context loading order (conflict resolution)
@@ -84,9 +107,9 @@ Before writing any utility, formatter, masking, conversion, or visual primitive,
 
 <provenance>
 Every non-trivial change produced with agent assistance should be traceable:
-- The PR description links the SPEC at `.cursor/specs/<slug>.spec.md` (when one exists).
-- The PR description names which agents ran (`frontend-architect`, `feature-implementer`, `adversarial-frontend-reviewer`, `pr-preflight`) and the outcome of the gate.
-- Manual QA plan at `docs/test-plans/<branch-slug>.md` is linked when the change is user-visible.
+- The PR description states the `change_class` (`trivial` | `feature` | `epic`).
+- For `feature`/`epic`: PR description links the SPEC at `.cursor/specs/<slug>.spec.md` and names which agents ran (`frontend-architect`, `feature-implementer`, `adversarial-frontend-reviewer`) and the outcome of the gate.
+- For `epic`: PR description also links the manual QA plan at `docs/test-plans/<branch-slug>.md` if `manual-test-planner` was invoked.
 
 NOTE: PR-template enforcement of provenance is **per-project and opt-in**. Until a project adopts it, provenance is recommended but not blocking.
 </provenance>
@@ -98,7 +121,8 @@ An agent MUST stop and ask the human when:
 - The SPEC's contracts conflict with reality and the amendment is non-obvious.
 - Implementation would require touching files outside the SPEC's manifest.
 - A skill, project rule, user rule, and spec disagree in a way the context-loading order doesn't resolve.
-- Repeated attempts (≥2) to satisfy `pr-preflight` or `adversarial-frontend-reviewer` fail on the same issue.
+- Repeated attempts (≥2) to satisfy the preflight script or `adversarial-frontend-reviewer` fail on the same issue.
+- The change crosses into territory that warrants escalating the `change_class` (e.g. mid-implementation, a `trivial` change reveals it actually touches a store + route — stop, reclassify as `feature`, ask for SPEC).
 
 Hallucinating progress is worse than stopping. Default to stopping.
 </stop>
