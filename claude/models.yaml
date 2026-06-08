@@ -1,0 +1,91 @@
+# Central model registry.
+#
+# NOTE FOR CLAUDE CODE: subagent `model:` fields use **tier aliases** (`opus`,
+# `sonnet`, `haiku`) which auto-resolve to Anthropic's current top model in
+# each tier. New releases propagate automatically; no per-agent edit needed.
+# The `primary`/`fallback` slugs below are documentation only — they record
+# WHICH concrete slug an alias resolved to at a given date, for audit.
+#
+# For the Cursor module (~/.cursor/), the `model:` fields are pinned to
+# specific slugs because Cursor's model picker uses different naming
+# (e.g. `claude-4.7-opus`). The two modules deliberately diverge here.
+#
+# Schema:
+#   roles:
+#     <role>:
+#       primary:     <model slug used by default>
+#       fallback:    <model slug if primary not available>
+#       rationale:   <one line — why this model for this role>
+#
+# Resolution order (when an agent declares `model_role: architect`):
+#   1. roles.architect.primary
+#   2. roles.architect.fallback
+#   3. inherit from parent agent
+#
+# IMPORTANT: Cursor agents still need a concrete `model:` field at runtime.
+# Until Cursor natively supports role indirection, the convention is:
+#   - Frontmatter declares BOTH `model_role:` (semantic) and `model:` (resolved).
+#   - When updating slugs, edit this file then run:
+#       ./cursor/scripts/resolve-models.sh    (TODO: Phase 3 hardening)
+#     which rewrites each agent's `model:` field from its `model_role:`.
+#   - Until that script exists, edit both fields by hand and keep them in sync.
+
+version: 1
+
+roles:
+  architect:
+    primary: claude-4.7-opus
+    fallback: claude-4.6-sonnet
+    rationale: >
+      Architectural reasoning + decision quality matters most. Errors here
+      cascade into the SPEC and every downstream agent. Worth premium.
+
+  reviewer:
+    primary: claude-4.7-opus
+    fallback: claude-4.6-sonnet
+    rationale: >
+      Finding non-obvious bugs is pure reasoning depth. False negatives
+      ship to production.
+
+  implementer:
+    primary: gpt-5.3-codex
+    fallback: claude-4.6-sonnet
+    rationale: >
+      Agentic coding + instruction-following. Codex is trained for this and
+      is deliberately less opinionated than Opus — a feature, since this
+      agent must NOT re-design.
+
+  visual:
+    primary: gemini-3.1-pro
+    fallback: claude-4.6-sonnet
+    rationale: >
+      Multimodal is the dominant skill for Figma intake. Strongest vision
+      in the lineup at workhorse price.
+
+  writer:
+    primary: claude-4.6-sonnet
+    fallback: composer-2
+    rationale: >
+      Writes for humans (test plans, refined tickets). Needs behavioral
+      reasoning and good prose at workhorse price.
+
+  conductor:
+    primary: claude-4.6-sonnet
+    fallback: composer-2
+    rationale: >
+      State machine + dispatch. Must reason about stage/checkpoints without
+      doing implementation. Sonnet hits the right cost/quality point.
+
+# The `mechanical` role was retired when `ticket-refiner` and `pr-preflight`
+# were demoted out of the subagent registry (ticket-refiner -> skill,
+# pr-preflight -> cursor/scripts/preflight.sh). Mechanical work no longer
+# rents a model.
+
+# Per-role agent assignment (informational; for audit / regenerator script).
+assignments:
+  architect:    [frontend-architect]
+  reviewer:     [adversarial-frontend-reviewer]
+  implementer:  [feature-implementer]
+  visual:       [figma-design-implementer]
+  writer:       [manual-test-planner]
+  conductor:    [pipeline-orchestrator]
