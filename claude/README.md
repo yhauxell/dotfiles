@@ -14,6 +14,8 @@ The pipeline is **opt-in by change class** — decide up front whether the work 
 | `agents/` | 6 subagents (architect, implementer, reviewer, figma, test-planner, orchestrator). |
 | `skills/` | Portable knowledge: `ticket-refinement` + 7 React/RN skills, auto-loaded in Pass 0. |
 | `scripts/preflight.sh` | The quality gate (lint / typecheck / test). Supports a two-tier fast path. |
+| `scripts/epic-resume.sh` | Headless resume trigger for autopilot epics (cron / launchd / scheduled agent). |
+| `specs/full-automation.spec.md` | Module SPEC: the ideation→delivery automation roadmap (PR1 = `epic-resume.sh`). |
 | `specs/_TEMPLATE.spec.md` | Global SPEC template. Real specs live per-project under `<project>/.claude/specs/`. |
 | `pipeline/_TEMPLATE.state.yaml`, `pipeline/_TEMPLATE.retro.md` | Epic state + retro templates (epic-class only). |
 | `settings.json` | Permissions + hook wiring (UserPromptSubmit, PreToolUse, PostToolUse). |
@@ -77,6 +79,18 @@ Use only when work spans weeks / multiple slices and you need state across sessi
 - **`/epic-status`** prints the dashboard (read-only, no model rental). Resume a stale epic anytime.
 - **Autopilot** (`--autopilot` or `enable autopilot`): `/epic-continue` chains non-gate stages automatically. It **always stops at the two hard gates** — `spec_draft` (→ `/approve-spec`) and `pr_open` (→ you review + merge). It never auto-merges and never skips review.
 - Commit the state YAML for team visibility, or gitignore `*.state.yaml` for local-only.
+
+### Headless resume (`scripts/epic-resume.sh`)
+
+Autopilot only chains stages inside a live session. To advance epics **unattended** — overnight, or after a gate clears — schedule `epic-resume.sh`:
+
+```bash
+epic-resume.sh [--dry-run] <project-dir> [<project-dir> ...]
+```
+
+It scans each project's `.claude/pipeline/*.state.yaml` and runs `claude -p "/epic-continue <slug>" --permission-mode acceptEdits` from the project root, but **only** when: `autopilot: true`, the stage is not a hard gate (`spec_draft`, `pr_open`) or `done`, the repo's checked-out branch matches the epic's branch (clobber guard), and a per-slug lock is free. One exception at `pr_open`: if `gh pr view` reports the PR **merged**, the human gate has cleared and it resumes so the orchestrator advances `merged → retro`. Decisions log to `~/.claude/logs/epic-resume.log`.
+
+Schedule it however you like — cron (`*/30 9-18 * * 1-5 ~/.claude/scripts/epic-resume.sh ~/work/my-app`), launchd, or a Claude Code scheduled task. The full automation roadmap (CI babysit loop, spec-judge, auto-merge opt-in, deploy watch) lives in `specs/full-automation.spec.md`.
 
 ### PR split (architect's job)
 

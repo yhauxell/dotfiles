@@ -32,8 +32,8 @@ Both modules implement the same opinionated, spec-driven, change-class-routed wo
 │   ├── commands/       # slash commands (/architect, /implement, /ship, /epic-*, …)
 │   ├── agents/         # 6 subagents (architect, implementer, reviewer, figma, test-planner, orchestrator)
 │   ├── skills/         # portable knowledge: ticket-refinement + 7 React/RN skills
-│   ├── scripts/        # preflight.sh (two-tier: --affected fast path + full gate)
-│   ├── specs/          # global SPEC template (project specs live per-project)
+│   ├── scripts/        # preflight.sh (two-tier gate), epic-resume.sh (headless resume)
+│   ├── specs/          # global SPEC template + module specs (project specs live per-project)
 │   ├── pipeline/       # state + retro templates (epic-class only)
 │   ├── settings.json   # permissions + hook wiring
 │   └── models.yaml     # central role→model registry
