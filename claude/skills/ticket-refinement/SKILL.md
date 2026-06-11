@@ -21,14 +21,16 @@ Turn a raw ticket into engineering-ready requirements. Tracker-agnostic — work
 - When you need codebase context, run an exploration pass (search, read) before drawing conclusions.
 - Prefer concrete, testable statements over vague guidance.
 - Identify the source tracker from the input (URL pattern or ticket key) and mirror its conventions where helpful (e.g. include the ticket key in the title) — but never hardcode tracker-specific terminology in the body.
+- **The whole ticket is context, not just the description.** Comments, attachments, and embedded links routinely carry the real requirements (scope changes agreed in a comment thread, a screenshot that contradicts the description, the Figma link that defines the actual UI). When tracker tools are available, fetch comments and attachments — do not refine from the description alone.
 
 ## Procedure
 
-1. Read the provided story / ticket / idea.
-2. Analyze the relevant codebase via an exploration pass.
-3. Define concrete acceptance criteria (prefer Gherkin syntax).
-4. Identify impacted files, API/data changes, and edge cases.
-5. Emit the refined description in Markdown.
+1. Read the **full** ticket: description, **all comments** (newest decisions win over the original description — note when a comment supersedes it), attachments, and screenshots. Fetch them via the tracker's tools when available.
+2. **Extract design sources**: collect every Figma URL found anywhere in the ticket (description, comments, attachment links) and every screenshot/mockup image. These feed `figma-design-implementer` downstream — capture them verbatim, with a note on where each was found and what it claims to show.
+3. Analyze the relevant codebase via an exploration pass.
+4. Define concrete acceptance criteria (prefer Gherkin syntax). Where a comment or screenshot resolved an ambiguity, bake the resolution into the AC rather than restating the ambiguity.
+5. Identify impacted files, API/data changes, and edge cases.
+6. Emit the refined description in Markdown, including the `Design sources` section whenever any were found.
 
 ## Output format
 
@@ -38,6 +40,12 @@ Turn a raw ticket into engineering-ready requirements. Tracker-agnostic — work
 - **Goals**
 - **Non-goals**
 - **Assumptions**
+
+### Design sources (feed figma-design-implementer)
+<Omit this section entirely if none were found.>
+- **Figma**: <URL> — found in <description | comment by X on DATE>; shows <frame/flow>
+- **Screenshots/mockups**: <attachment name or URL> — <what it shows>
+- **Comment-sourced decisions affecting the design**: <e.g. "comment 2026-05-02: empty state dropped from scope">
 
 ### Acceptance criteria
 <Gherkin scenarios>
@@ -63,3 +71,5 @@ Turn a raw ticket into engineering-ready requirements. Tracker-agnostic — work
 ## Handoff
 
 For `feature` and `epic` classes, the refined story feeds `frontend-architect` (which writes the SPEC). The refined Markdown is conversational context; the SPEC is the contract.
+
+**When `Design sources` contains Figma URLs**, the pipeline routes through `figma-design-implementer` *before* the architect: invoke it with the extracted Figma URL(s) **plus** the relevant ticket context (the comment-sourced design decisions and what each screenshot shows), so it extracts design context with the same understanding of scope you have. Its `Design context` block and the refined story then go to `/architect` together. State this next step explicitly when emitting the refined story — don't leave the routing implicit.
