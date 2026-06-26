@@ -88,9 +88,10 @@ function projectDirOf(file) {
 const day = (iso) => (iso ? String(iso).slice(0, 10) : null);
 
 // ---- parse ---------------------------------------------------------------
-const messages = new Map();   // uuid -> row
+const messages = new Map();   // uuid -> row (one per API call; see requestId dedupe)
 const prompts = new Map();     // uuid -> row
 const seenSessions = new Set();
+const seenReq = new Set();     // requestId -> already-counted (billing dedupe)
 
 async function parseFile(file) {
   const projectDir = projectDirOf(file);
@@ -104,6 +105,12 @@ async function parseFile(file) {
     try { o = JSON.parse(line); } catch { continue; }
 
     if (o.type === 'assistant' && o.message && o.message.usage && o.uuid) {
+      // Billing is per API call (requestId), not per logged line. A single
+      // streamed response is written as multiple assistant lines (one per
+      // content block), each REPEATING the same usage block. Summing per
+      // uuid double-counts (~1.9x). Dedupe on requestId; first line wins.
+      const rid = o.requestId;
+      if (rid) { if (seenReq.has(rid)) continue; seenReq.add(rid); }
       const u = o.message.usage;
       const cc = u.cache_creation || {};
       const model = o.message.model || null;
