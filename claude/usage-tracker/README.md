@@ -35,7 +35,23 @@ Useful flags:
 
 - `node ingest.js --filter panel-next` — only ingest transcripts whose path matches a substring.
 - `node ingest.js --projects <dir>` / `--db <path>` / `--pricing <path>` — override locations.
+- `node build-dashboard.js --since 2026-06-01 [--until 2026-06-30]` — scope the dashboard to a date window (the DB stays full; only the view is filtered).
 - `node build-dashboard.js --sessions 100` — cap the sessions table.
+
+## Matching an external meter (e.g. Claude.ai subscription usage)
+
+The dashboard's dollar is **notional list pricing**; a subscription usage meter
+prices the same tokens in plan-specific dollar-equivalent terms and resets each
+**billing cycle**. You can't match it exactly, but you can calibrate:
+
+1. **Scope to your cycle**: `node build-dashboard.js --since <cycle-start-date>`. Read the notional total it prints.
+2. **Calibrate**: set `"calibration"` in `pricing.json` to `(meter reading) / (notional total)`. Every figure then scales to your meter's basis, and the header switches to "calibrated ×N". Re-run with the same `--since` to verify.
+
+Two structural caveats remain even after calibrating: the tracker sums **all
+projects and accounts** in `~/.claude/projects`, while your meter is one account;
+and per-token accuracy depends on `pricing.json` rates being correct for the
+current model versions. Treat the calibrated number as a close approximation,
+not a reconciliation.
 
 ## ⚠️ About the money figure
 

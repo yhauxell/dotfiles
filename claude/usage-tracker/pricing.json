@@ -1,5 +1,7 @@
 {
   "_about": "Notional list API prices in USD per 1,000,000 tokens. On a Claude Code subscription (Pro/Max) you are NOT billed per token — these figures are an EQUIVALENT cost so you can compare the relative expense of flows/sessions, not your actual bill. Edit freely when prices change.",
+  "calibration": 1.0,
+  "_calibration_about": "Multiplier applied to every cost so the dashboard can approximate an external meter (e.g. Claude.ai subscription usage). To set it: build for your billing-cycle window (build-dashboard.js --since <cycle-start>), read the notional total, then set calibration = (meter reading) / (notional total). 1.0 = raw list pricing.",
   "_multipliers": {
     "_about": "Cache and long-context rates are derived from each model's base input rate.",
     "cacheWrite5m": 1.25,

@@ -15,49 +15,65 @@ const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 && args[i + 1] 
 const DB = opt('--db', path.join(__dirname, 'usage.sqlite'));
 const OUT = opt('--out', path.join(__dirname, 'dashboard.html'));
 const SESSION_LIMIT = parseInt(opt('--sessions', '300'), 10);
+const SINCE = opt('--since', null);   // YYYY-MM-DD inclusive (billing-cycle start)
+const UNTIL = opt('--until', null);   // YYYY-MM-DD inclusive
 
 if (!fs.existsSync(DB)) {
   console.error(`DB not found: ${DB}\nRun "node ingest.js" first.`);
   process.exit(1);
 }
+const pricing = JSON.parse(fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8'));
+// Calibration: scale notional cost to match an external meter. Set
+// pricing.calibration to (your meter reading) / (this dashboard's notional for
+// the same --since window). 1.0 = raw list pricing.
+const CAL = +(pricing.calibration ?? 1) || 1;
+const C = (expr) => `ROUND((${expr})*${CAL},2)`; // calibrated cost expression
+
+// Date-window filters (on messages.day and sessions.first_ts).
+const mWhere = [SINCE && `day >= '${SINCE}'`, UNTIL && `day <= '${UNTIL}'`].filter(Boolean);
+const sWhere = [SINCE && `substr(first_ts,1,10) >= '${SINCE}'`, UNTIL && `substr(first_ts,1,10) <= '${UNTIL}'`].filter(Boolean);
+const WM = mWhere.length ? 'WHERE ' + mWhere.join(' AND ') : '';
+const WS = sWhere.length ? 'WHERE ' + sWhere.join(' AND ') : '';
+const andM = mWhere.length ? 'AND ' + mWhere.join(' AND ') : '';
+
 const q = (sql) => JSON.parse(execFileSync('sqlite3', ['-json', DB, sql], { maxBuffer: 1024 * 1024 * 256 }).toString() || '[]');
 
 const totals = q(`SELECT
-    (SELECT ROUND(SUM(cost_usd),2) FROM messages) AS cost,
-    (SELECT SUM(input_tokens) FROM messages) AS fresh_in,
-    (SELECT SUM(output_tokens) FROM messages) AS out_tok,
-    (SELECT SUM(cache_creation_5m+cache_creation_1h) FROM messages) AS cache_write,
-    (SELECT SUM(cache_read_tokens) FROM messages) AS cache_read,
-    (SELECT COUNT(*) FROM messages) AS turns,
-    (SELECT COUNT(*) FROM sessions) AS sessions,
-    (SELECT ROUND(SUM(active_sec)/3600.0,1) FROM sessions) AS active_hrs`)[0];
+    (SELECT ${C('SUM(cost_usd)')} FROM messages ${WM}) AS cost,
+    (SELECT SUM(input_tokens) FROM messages ${WM}) AS fresh_in,
+    (SELECT SUM(output_tokens) FROM messages ${WM}) AS out_tok,
+    (SELECT SUM(cache_creation_5m+cache_creation_1h) FROM messages ${WM}) AS cache_write,
+    (SELECT SUM(cache_read_tokens) FROM messages ${WM}) AS cache_read,
+    (SELECT COUNT(*) FROM messages ${WM}) AS turns,
+    (SELECT COUNT(*) FROM sessions ${WS}) AS sessions,
+    (SELECT ROUND(SUM(active_sec)/3600.0,1) FROM sessions ${WS}) AS active_hrs`)[0];
 
-const daily = q(`SELECT m.day AS day, ROUND(SUM(m.cost_usd),2) AS cost, COUNT(*) AS turns,
+const daily = q(`SELECT m.day AS day, ${C('SUM(m.cost_usd)')} AS cost, COUNT(*) AS turns,
     (SELECT ROUND(SUM(active_sec)/3600.0,2) FROM sessions s WHERE substr(s.first_ts,1,10)=m.day) AS active_hrs
-  FROM messages m GROUP BY m.day ORDER BY m.day`);
+  FROM messages m ${WM} GROUP BY m.day ORDER BY m.day`);
 
 const byFlow = q(`SELECT COALESCE(attribution_skill,'(conversation)') AS flow,
-    ROUND(SUM(cost_usd),2) AS cost, COUNT(*) AS turns,
-    ROUND(SUM(cost_usd)/COUNT(*),3) AS cost_per_turn
-  FROM messages GROUP BY flow ORDER BY cost DESC`);
+    ${C('SUM(cost_usd)')} AS cost, COUNT(*) AS turns,
+    ${C('SUM(cost_usd)/COUNT(*)')} AS cost_per_turn
+  FROM messages ${WM} GROUP BY flow ORDER BY cost DESC`);
 
-const byFamily = q(`SELECT family, ROUND(SUM(cost_usd),2) AS cost, COUNT(*) AS turns,
+const byFamily = q(`SELECT family, ${C('SUM(cost_usd)')} AS cost, COUNT(*) AS turns,
     SUM(input_tokens+output_tokens) AS billed_tokens
-  FROM messages GROUP BY family ORDER BY cost DESC`);
+  FROM messages ${WM} GROUP BY family ORDER BY cost DESC`);
 
-const byProject = q(`SELECT project_dir, ROUND(SUM(cost_usd),2) AS cost,
+const byProject = q(`SELECT project_dir, ${C('SUM(cost_usd)')} AS cost,
     COUNT(DISTINCT session_id) AS sessions
-  FROM messages GROUP BY project_dir ORDER BY cost DESC LIMIT 15`);
+  FROM messages ${WM} GROUP BY project_dir ORDER BY cost DESC LIMIT 15`);
 
 const sessions = q(`SELECT session_id, substr(first_ts,1,10) AS day, first_ts, project_dir, git_branch,
-    top_skill, message_count, duration_sec, active_sec, models, cost_usd,
+    top_skill, message_count, duration_sec, active_sec, models, ${C('cost_usd')} AS cost_usd,
     input_tokens, output_tokens, cache_read_tokens, first_prompt
-  FROM sessions ORDER BY first_ts DESC LIMIT ${SESSION_LIMIT}`);
+  FROM sessions ${WS} ORDER BY first_ts DESC LIMIT ${SESSION_LIMIT}`);
 
 const generatedAt = execFileSync('date', ['+%Y-%m-%d %H:%M']).toString().trim();
-const pricing = JSON.parse(fs.readFileSync(path.join(__dirname, 'pricing.json'), 'utf8'));
+const windowLabel = (SINCE || UNTIL) ? `${SINCE || '…'} → ${UNTIL || 'now'}` : 'all time';
 
-const DATA = { totals, daily, byFlow, byFamily, byProject, sessions, generatedAt, families: pricing.families };
+const DATA = { totals, daily, byFlow, byFamily, byProject, sessions, generatedAt, families: pricing.families, windowLabel, calibration: CAL };
 
 const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -102,7 +118,8 @@ const html = `<!DOCTYPE html>
 <header>
   <h1>Claude Code · usage tracker</h1>
   <span class="sub">generated ${generatedAt}</span>
-  <span class="sub">notional list-API cost — comparative, not your subscription bill</span>
+  <span class="sub">window: ${windowLabel}</span>
+  <span class="sub">${CAL === 1 ? 'notional list-API cost — comparative, not your subscription bill' : 'calibrated ×' + CAL + ' to external meter'}</span>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
