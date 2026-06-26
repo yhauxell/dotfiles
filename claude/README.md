@@ -18,6 +18,7 @@ The pipeline is **opt-in by change class** — decide up front whether the work 
 | `specs/full-automation.spec.md` | Module SPEC: the ideation→delivery automation roadmap (PR1 = `epic-resume.sh`). |
 | `specs/_TEMPLATE.spec.md` | Global SPEC template. Real specs live per-project under `<project>/.claude/specs/`. |
 | `pipeline/_TEMPLATE.state.yaml`, `pipeline/_TEMPLATE.retro.md` | Epic state + retro templates (epic-class only). |
+| `usage-tracker/` | Time & cost dashboard for your sessions (`track.sh` → `dashboard.html`). See its own [README](usage-tracker/README.md). |
 | `settings.json` | Permissions + hook wiring (UserPromptSubmit, PreToolUse, PostToolUse). |
 | `models.yaml` | Central role→model registry. |
 
@@ -117,6 +118,18 @@ Flags: `--keep-going`, `--staged-only`, `--affected[=<base>]`, `--base=<ref>`, `
 | `pipeline-gate-router.py` | `UserPromptSubmit` | commit/push/PR/ship mentioned → prepends "run `/ship` first". Opt out: `skip gate`. |
 | `writer-guard.py` | `PreToolUse` (`Edit\|Write\|MultiEdit`) | **BLOCKS** (exit 2) unauthorized writes to `.claude/specs/`, `.claude/pipeline/`, `docs/test-plans/`. Logs to `~/.claude/audit/writer-violations.jsonl`. |
 | `spec-archive.py` | `PostToolUse` (`Edit\|Write\|MultiEdit`) | When `.spec.vN.md` (N≥2) is written, moves older versions to `.claude/specs/archive/`. |
+
+## 4.5 Usage tracking (time & cost dashboard)
+
+`usage-tracker/` turns your session transcripts into a self-contained HTML dashboard so you can see where time and money go — and tune the expensive flows. Zero npm deps: Node parses the transcripts, the system `sqlite3` CLI stores/queries, charts are hand-rolled SVG (no network/CDN).
+
+```bash
+~/.claude/usage-tracker/track.sh --open   # ingest all sessions + rebuild dashboard + open it
+```
+
+It reads `~/.claude/projects/**.jsonl` (every assistant turn's token usage, model, timestamp, `attributionSkill`, branch) and surfaces: notional cost, active time (idle gaps capped at 5 min so resumed-session spans don't inflate it), a daily cost trend with an active-hours overlay, cost by model, **cost by flow/skill with cost-per-turn** (the pipeline-tuning view), cache efficiency, cost by project, and a sortable per-session task table.
+
+> **Money is notional list-API pricing** (editable `usage-tracker/pricing.json`) — an *equivalent cost* for comparing flows, not your subscription bill. The generated `usage.sqlite` / `dashboard.html` embed prompt text + paths and are gitignored. Full docs: [usage-tracker/README.md](usage-tracker/README.md).
 
 ## 5. Reference card
 

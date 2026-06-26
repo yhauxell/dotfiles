@@ -35,6 +35,7 @@ Both modules implement the same opinionated, spec-driven, change-class-routed wo
 │   ├── scripts/        # preflight.sh (two-tier gate), epic-resume.sh (headless resume)
 │   ├── specs/          # global SPEC template + module specs (project specs live per-project)
 │   ├── pipeline/       # state + retro templates (epic-class only)
+│   ├── usage-tracker/  # time & cost dashboard for sessions (track.sh -> dashboard.html)
 │   ├── settings.json   # permissions + hook wiring
 │   └── models.yaml     # central role→model registry
 └── cursor/             # tool module -> ~/.cursor/   (see cursor/README.md)
