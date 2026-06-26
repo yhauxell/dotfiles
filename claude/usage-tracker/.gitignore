@@ -1,0 +1,6 @@
+# Generated, machine-local, and privacy-sensitive — never commit.
+# The DB and dashboard embed your prompt text, cwd paths, and branch names.
+usage.sqlite
+usage.sqlite-wal
+usage.sqlite-shm
+dashboard.html
